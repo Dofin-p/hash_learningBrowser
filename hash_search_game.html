@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hash Quest v2: 検索アルゴリズム完全版</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #f3f4f6;
+            --panel: #ffffff;
+            --box-hidden: #374151;
+        }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg);
+            color: #333;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            background-color: #1f2937;
+            color: white;
+            width: 100%;
+            padding: 1rem 0;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        main {
+            width: 90%;
+            max-width: 800px;
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+            background: var(--panel);
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .nav-tabs {
+            display: flex;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #e5e7eb;
+            flex-wrap: wrap;
+        }
+        .nav-item {
+            padding: 0.8rem 1.5rem;
+            cursor: pointer;
+            font-weight: bold;
+            color: #6b7280;
+            transition: all 0.3s;
+        }
+        .nav-item:hover { background-color: #f9fafb; }
+        .nav-item.active {
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+        }
+        .stage {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        .stage.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Game Elements */
+        .game-area {
+            background: #e5e7eb;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            margin: 1rem 0;
+            position: relative;
+        }
+        .array-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .box {
+            width: 60px;
+            height: 80px;
+            background: white;
+            border: 2px solid #9ca3af;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s;
+            user-select: none;
+        }
+        .box:hover {
+            transform: scale(1.05);
+            border-color: var(--primary);
+        }
+        .box-index {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-bottom: 4px;
+            position: absolute;
+            top: -25px;
+        }
+        .box-content {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+        
+        /* Search Mode Specifics */
+        .box.hidden {
+            background-color: var(--box-hidden);
+            border-color: var(--box-hidden);
+            color: white;
+        }
+        .box.hidden .box-content {
+            display: none;
+        }
+        .box.hidden::after {
+            content: "?";
+            font-size: 2rem;
+            color: #6b7280;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .box.revealed {
+            background-color: white;
+            animation: flip 0.4s;
+        }
+        @keyframes flip {
+            0% { transform: rotateY(0); }
+            50% { transform: rotateY(90deg); background: var(--box-hidden); }
+            100% { transform: rotateY(0); background: white; }
+        }
+
+        .target-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            background: white;
+            padding: 0.5rem 2rem;
+            border-radius: 0.5rem;
+            display: inline-block;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        .btn-reset { background: #6b7280; }
+        .btn:hover { opacity: 0.9; }
+        .message {
+            margin-top: 1rem;
+            font-weight: bold;
+            min-height: 1.5rem;
+        }
+        .hint-box {
+            background-color: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #92400e;
+        }
+        
+        /* State Colors */
+        .occupied { background-color: #d1fae5; border-color: var(--success); }
+        .collision { background-color: #fee2e2; border-color: var(--danger); animation: shake 0.5s; }
+        .checked-empty { background-color: #e5e7eb; border-color: #9ca3af; opacity: 0.7; }
+        
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Hash Quest v2: Visual Algorithm Learning</h1>
+</header>
+
+<main>
+    <div class="nav-tabs">
+        <div class="nav-item active" onclick="switchStage(1)">Stage 1: ハッシュ関数</div>
+        <div class="nav-item" onclick="switchStage(2)">Stage 2: 格納 (Direct)</div>
+        <div class="nav-item" onclick="switchStage(3)">Stage 3: 衝突解決</div>
+        <div class="nav-item" onclick="switchStage(4)">Stage 4: 検索 (Search)</div>
+    </div>
+
+    <div id="stage1" class="stage active">
+        <h2>Stage 1: ハッシュ値の計算 (Modulo)</h2>
+        <p>ハッシュ検索の基本は「計算」です。データ $k$ を箱の数 $m$ で割った余りを求めます。</p>
+        <div class="hint-box">
+            式: $h(k) = k \pmod 5$<br>
+            例: 13 ÷ 5 = 2 余り <strong>3</strong> → 3番の箱へ。
+        </div>
+        <div class="game-area">
+            <div>現在のデータ: <span id="s1-target" class="target-number">?</span></div>
+            <div class="message" id="s1-msg">正しい箱をクリックしてください！</div>
+            <div class="array-container">
+                <div class="box" onclick="checkS1(0)"><span class="box-index">0</span></div>
+                <div class="box" onclick="checkS1(1)"><span class="box-index">1</span></div>
+                <div class="box" onclick="checkS1(2)"><span class="box-index">2</span></div>
+                <div class="box" onclick="checkS1(3)"><span class="box-index">3</span></div>
+                <div class="box" onclick="checkS1(4)"><span class="box-index">4</span></div>
+            </div>
+            <button class="btn" onclick="initS1()">次の問題</button>
+        </div>
+    </div>
+
+    <div id="stage2" class="stage">
+        <h2>Stage 2: ダイレクトアクセス</h2>
+        <p>計算した場所に一発でデータを入れる感覚を掴みましょう。</p>
+        <div class="hint-box">箱の数は <strong>7</strong> です。 $Mod\ 7$ を計算してください。</div>
+        <div class="game-area">
+            <div>格納するデータ: <span id="s2-target" class="target-number">?</span></div>
+            <div class="message" id="s2-msg">計算して、正しい格納場所をクリック！</div>
+            <div class="array-container" id="s2-container"></div>
+            <button class="btn" onclick="initS2()">リセット</button>
+        </div>
+    </div>
+
+    <div id="stage3" class="stage">
+        <h2>Stage 3: 衝突（コリジョン）と線形探索</h2>
+        <p>計算した場所が埋まっていたら、右隣（+1）の空きを探します（オープンアドレス法）。</p>
+        <div class="hint-box">箱の数は <strong>7</strong>。埋まっていたら右へ移動。</div>
+        <div class="game-area">
+            <div>格納するデータ: <span id="s3-target" class="target-number">?</span></div>
+            <div class="message" id="s3-msg">衝突に注意して格納場所を選んでください。</div>
+            <div class="array-container" id="s3-container"></div>
+            <button class="btn" onclick="nextS3()">次のデータ</button>
+            <button class="btn btn-reset" onclick="resetS3()">最初から</button>
+        </div>
+    </div>
+
+    <div id="stage4" class="stage">
+        <h2>Stage 4: ハッシュ検索の実践</h2>
+        <p>データは既に格納されています（中身は見えません）。<br>
+        「計算」を使って、ターゲットの数字を<strong>最短手数</strong>で見つけ出してください。<br>
+        衝突が起きている可能性も考慮する必要があります。</p>
+
+        <div class="hint-box">
+            💡 <strong>検索アルゴリズムの手順:</strong><br>
+            1. まず $Target \pmod 7$ の場所をめくる。<br>
+            2. 見つかれば終了。<br>
+            3. 違う数字が入っていたら、それは「衝突」の結果かも。右隣をめくる。<br>
+            4. 空っぽなら、そのデータは存在しない。
+        </div>
+
+        <div class="game-area">
+            <div>探すデータ: <span id="s4-target" class="target-number">?</span></div>
+            <div class="message" id="s4-msg">ハッシュ値を計算して、データがありそうな場所をクリック！</div>
+
+            <div class="array-container" id="s4-container">
+                </div>
+            
+            <div style="margin-top:20px;">
+                <button class="btn" onclick="initS4()">新しい問題 (リセット)</button>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<script>
+    // --- Common Functions ---
+    function switchStage(stageNum) {
+        document.querySelectorAll('.stage').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        
+        document.getElementById(`stage${stageNum}`).classList.add('active');
+        document.querySelectorAll('.nav-item')[stageNum-1].classList.add('active');
+
+        if(stageNum === 1) initS1();
+        if(stageNum === 2) initS2();
+        if(stageNum === 3) resetS3();
+        if(stageNum === 4) initS4();
+    }
+
+    // --- Stage 1 Logic ---
+    let s1CurrentTarget = 0;
+    function initS1() {
+        s1CurrentTarget = Math.floor(Math.random() * 50) + 1;
+        document.getElementById('s1-target').textContent = s1CurrentTarget;
+        document.getElementById('s1-msg').textContent = "正しい箱をクリックしてください！";
+        document.getElementById('s1-msg').style.color = "#333";
+        const boxes = document.querySelectorAll('#stage1 .box');
+        boxes.forEach(b => {
+            b.style.backgroundColor = 'white';
+            b.style.borderColor = '#9ca3af';
+        });
+    }
+
+    function checkS1(index) {
+        const correctIndex = s1CurrentTarget % 5;
+        const boxes = document.querySelectorAll('#stage1 .box');
+        if (index === correctIndex) {
+            document.getElementById('s1-msg').textContent = `正解！ ${s1CurrentTarget} % 5 = ${correctIndex}`;
+            document.getElementById('s1-msg').style.color = "var(--success)";
+            boxes[index].style.backgroundColor = "#d1fae5";
+            boxes[index].style.borderColor = "var(--success)";
+        } else {
+            document.getElementById('s1-msg').textContent = `違います... ${s1CurrentTarget} % 5 は ${index} ではありません。`;
+            document.getElementById('s1-msg').style.color = "var(--danger)";
+            boxes[index].style.borderColor = "var(--danger)";
+        }
+    }
+
+    // --- Stage 2 Logic ---
+    let s2CurrentTarget = 0;
+    const s2Size = 7;
+    function initS2() {
+        const container = document.getElementById('s2-container');
+        container.innerHTML = '';
+        for(let i=0; i<s2Size; i++) {
+            container.innerHTML += `<div class="box" onclick="checkS2(${i})"><span class="box-index">${i}</span><div class="box-content" id="s2-content-${i}"></div></div>`;
+        }
+        nextS2Problem();
+    }
+    function nextS2Problem() {
+        s2CurrentTarget = Math.floor(Math.random() * 50) + 1;
+        document.getElementById('s2-target').textContent = s2CurrentTarget;
+        document.getElementById('s2-msg').textContent = "計算して、正しい格納場所をクリック！";
+        document.getElementById('s2-msg').style.color = "#333";
+    }
+    function checkS2(index) {
+        const correctIndex = s2CurrentTarget % s2Size;
+        const targetBox = document.getElementById(`s2-content-${index}`);
+        const parentBox = targetBox.parentElement;
+        if (index === correctIndex) {
+            targetBox.textContent = s2CurrentTarget;
+            parentBox.classList.add('occupied');
+            document.getElementById('s2-msg').textContent = "Excellent! 正しい場所に格納されました。";
+            document.getElementById('s2-msg').style.color = "var(--success)";
+            setTimeout(nextS2Problem, 1000);
+        } else {
+            document.getElementById('s2-msg').textContent = "Oops! 計算が間違っています。";
+            document.getElementById('s2-msg').style.color = "var(--danger)";
+        }
+    }
+
+    // --- Stage 3 Logic ---
+    const s3Size = 7;
+    let s3Data = Array(s3Size).fill(null);
+    let s3Queue = [14, 21, 8, 15, 22]; 
+    let s3Step = 0;
+    function resetS3() {
+        s3Data = Array(s3Size).fill(null);
+        s3Step = 0;
+        s3Queue = [7, 14, 9, 16, 25]; 
+        renderS3();
+        nextS3();
+    }
+    function renderS3() {
+        const container = document.getElementById('s3-container');
+        container.innerHTML = '';
+        for(let i=0; i<s3Size; i++) {
+            let content = s3Data[i] === null ? '' : s3Data[i];
+            let occupiedClass = s3Data[i] !== null ? 'occupied' : '';
+            container.innerHTML += `<div class="box ${occupiedClass}" onclick="checkS3(${i})" id="s3-box-${i}"><span class="box-index">${i}</span><div class="box-content">${content}</div></div>`;
+        }
+    }
+    function nextS3() {
+        if (s3Step >= s3Queue.length) {
+            document.getElementById('s3-target').textContent = "完了";
+            document.getElementById('s3-msg').textContent = "すべてのデータを格納しました！";
+            return;
+        }
+        let val = s3Queue[s3Step];
+        document.getElementById('s3-target').textContent = val;
+        document.getElementById('s3-msg').textContent = `${val} を格納します。 (${val} % 7 = ${val%7})`;
+    }
+    function checkS3(index) {
+        if (s3Step >= s3Queue.length) return;
+        const val = s3Queue[s3Step];
+        const idealIndex = val % s3Size;
+        if (s3Data[index] !== null) {
+            const box = document.getElementById(`s3-box-${index}`);
+            box.classList.add('collision');
+            document.getElementById('s3-msg').textContent = "衝突発生！ ここは埋まっています。次の空きを探して！";
+            setTimeout(() => box.classList.remove('collision'), 500);
+            return;
+        }
+        let correctSlot = -1;
+        for (let i = 0; i < s3Size; i++) {
+            let probe = (idealIndex + i) % s3Size;
+            if (s3Data[probe] === null) {
+                correctSlot = probe;
+                break;
+            }
+        }
+        if (index === correctSlot) {
+            s3Data[index] = val;
+            renderS3();
+            s3Step++;
+            document.getElementById('s3-msg').textContent = "正解！ 空いている場所に格納しました。";
+            document.getElementById('s3-msg').style.color = "var(--success)";
+            setTimeout(() => {
+                document.getElementById('s3-msg').style.color = "#333";
+                nextS3();
+            }, 1000);
+        } else {
+             document.getElementById('s3-msg').textContent = "ルール違反です。本来の場所から順番に探して、最初に見つかった空きに入れてください。";
+             document.getElementById('s3-msg').style.color = "var(--danger)";
+        }
+    }
+
+    // --- Stage 4 Logic (Search Mode) ---
+    const s4Size = 7;
+    // Preset Data designed to have collisions
+    // 14 % 7 = 0
+    // 21 % 7 = 0 (Collision -> 1)
+    // 9 % 7 = 2
+    // 16 % 7 = 2 (Collision -> 3)
+    // 25 % 7 = 4
+    const s4PresetData = [14, 21, 9, 16, 25, null, null]; 
+    let s4Revealed = Array(s4Size).fill(false);
+    let s4Target = 0;
+    
+    // Possible search targets: numbers in array + some random numbers not in array
+    const s4ProblemSet = [14, 9, 21, 16, 25, 99, 50]; 
+    
+    function initS4() {
+        s4Revealed = Array(s4Size).fill(false);
+        renderS4();
+        pickS4Target();
+    }
+
+    function pickS4Target() {
+        // Pick random target
+        s4Target = s4ProblemSet[Math.floor(Math.random() * s4ProblemSet.length)];
+        document.getElementById('s4-target').textContent = s4Target;
+        document.getElementById('s4-msg').textContent = `数値 ${s4Target} を探してください。 (ヒント: ${s4Target} % 7 = ${s4Target % 7})`;
+        document.getElementById('s4-msg').style.color = "#333";
+        // Re-hide boxes for new round if needed? No, let's keep revealed state per "game" reset
+        // To make it replayable without full reset, we might want to hide only if we want fresh memory
+        // For this design: Full reset per problem is clearer for learning
+        s4Revealed = Array(s4Size).fill(false);
+        renderS4();
+    }
+
+    function renderS4() {
+        const container = document.getElementById('s4-container');
+        container.innerHTML = '';
+        for(let i=0; i<s4Size; i++) {
+            const val = s4PresetData[i];
+            const displayVal = val === null ? "Empty" : val;
+            const isHidden = !s4Revealed[i];
+            const hiddenClass = isHidden ? 'hidden' : 'revealed';
+            const bgClass = (!isHidden && val !== null) ? 'occupied' : ((!isHidden && val === null) ? 'checked-empty' : '');
+            
+            container.innerHTML += `
+                <div class="box ${hiddenClass} ${bgClass}" onclick="checkS4(${i})" id="s4-box-${i}">
+                    <span class="box-index">${i}</span>
+                    <div class="box-content">${displayVal}</div>
+                </div>`;
+        }
+    }
+
+    function checkS4(index) {
+        if (s4Revealed[index]) return; // Already checked
+
+        s4Revealed[index] = true;
+        renderS4(); // Update visuals to show content
+
+        const val = s4PresetData[index];
+        const target = s4Target;
+        const idealIndex = target % s4Size;
+
+        // Validation Logic
+        // User must start checking from idealIndex
+        // If they click somewhere random, warn them (optional, but good for learning)
+        
+        // Check if found
+        if (val === target) {
+            document.getElementById('s4-msg').textContent = `発見！ ${target} はインデックス ${index} にありました。`;
+            document.getElementById('s4-msg').style.color = "var(--success)";
+            const box = document.getElementById(`s4-box-${index}`);
+            box.style.borderColor = "var(--success)";
+            box.style.borderWidth = "4px";
+            return;
+        }
+
+        // Check if empty -> Not found
+        if (val === null) {
+            document.getElementById('s4-msg').textContent = `空です。線形探索ルールにより、これ以降にデータはありません。${target} は存在しません。`;
+            document.getElementById('s4-msg').style.color = "var(--warning)";
+            return;
+        }
+
+        // Collision / Wrong Data
+        if (val !== target) {
+            // Did user start correctly?
+            // Simple feedback:
+            document.getElementById('s4-msg').textContent = `違います（${val}）。ターゲットではありません。ハッシュ法のルールに従って次を探してください。`;
+            document.getElementById('s4-msg').style.color = "var(--danger)";
+        }
+    }
+
+    // Initialize first tab
+    initS1();
+</script>
+
+</body>
+</html>hash_search_game.html
